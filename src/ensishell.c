@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "variante.h"
 #include "readcmd.h"
@@ -108,7 +109,6 @@ int main() {
 		}
 		
 
-		
 		if (l->err) {
 			/* Syntax error, read another command */
 			printf("error: %s\n", l->err);
@@ -123,11 +123,34 @@ int main() {
 		for (i=0; l->seq[i]!=0; i++) {
 			char **cmd = l->seq[i];
 			printf("seq[%d]: ", i);
-                        for (j=0; cmd[j]!=0; j++) {
-                                printf("'%s' ", cmd[j]);
-                        }
+			for (j=0; cmd[j]!=0; j++) {
+					printf("'%s' ", cmd[j]);
+			}
 			printf("\n");
 		}
-	}
+		
 
+		// char* command = "ls";
+    	char* argument_list[] = {"ls", "-l", NULL};
+		execute_command((char **)argument_list);
+	}
+}
+
+
+void execute_command(char **argv) {
+	__pid_t pid;
+	int status;
+
+	if ((pid = fork()) == -1) {
+		printf("forking error");
+		exit(1);
+	} else if (pid == 0) {
+		int id_cmd = execvp(*argv, argv);
+		if (id_cmd == -1 ) {
+			printf("execvp error! \n" );
+			exit(1);
+		}
+	} else {
+		while (wait(&status) != pid) {};
+	}
 }

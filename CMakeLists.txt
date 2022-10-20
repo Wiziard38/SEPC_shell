@@ -13,8 +13,8 @@ enable_testing()
 # Vous devez editer les deux lignes SET suivantes pour y mettre vos logins
 # et le numéro de la variante que vous avez choisi
 #########
-set(VARIANTE_LOGINS login1 login2 login3)
-set(VARIANTE_SUJET -1)
+set(VARIANTE_LOGINS fauchonj giraulma)
+set(VARIANTE_SUJET 2)
 ### FIN de la zone à éditer / END of the two line area to edit
 
 list(SORT VARIANTE_LOGINS)
