@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/wait.h>
 
 #include "variante.h"
 #include "readcmd.h"
@@ -16,6 +17,14 @@
 #ifndef VARIANTE
 #error "Variante non défini !!"
 #endif
+
+typedef struct process {
+	pid_t process_id;
+	char* process_cmd;
+	struct process *next_process;
+} process;
+
+struct process *bg_process_list = NULL;
 
 /* Guile (1.8 and 2.0) is auto-detected by cmake */
 /* To disable Scheme interpreter (Guile support), comment the
@@ -57,6 +66,44 @@ void terminate(char *line) {
 	  free(line);
 	printf("exit\n");
 	exit(0);
+}
+
+void add_bg_process(pid_t pid, char* command) {
+	struct process *new_process = malloc(sizeof(struct process));
+	new_process->process_id = pid;
+	new_process->process_cmd = malloc(sizeof(command));
+	strcpy(new_process->process_cmd, command);
+
+	if (bg_process_list == NULL) {
+		new_process->next_process = NULL;
+		bg_process_list = new_process;
+	} else {
+		new_process->next_process = bg_process_list;
+		bg_process_list = new_process;
+	}
+
+}
+
+
+void execute_command(struct cmdline *l) {
+	pid_t pid;
+	int status;
+
+	pid = fork();
+	if (pid == 0) {
+		execvp(l->seq[0][0], l->seq[0]);
+		printf("execvp error! \n" );
+		exit(0);
+	} else if (pid == -1) {
+		printf("forking error");
+	}
+
+	if(l->bg){
+		add_bg_process(pid, l->seq[0][0]);
+	} else {
+		status = 0;
+		waitpid(pid, &status, 0);
+	}
 }
 
 
@@ -127,30 +174,7 @@ int main() {
 					printf("'%s' ", cmd[j]);
 			}
 			printf("\n");
-		}
-		
-
-		// char* command = "ls";
-    	char* argument_list[] = {"ls", "-l", NULL};
-		execute_command((char **)argument_list);
-	}
-}
-
-
-void execute_command(char **argv) {
-	__pid_t pid;
-	int status;
-
-	if ((pid = fork()) == -1) {
-		printf("forking error");
-		exit(1);
-	} else if (pid == 0) {
-		int id_cmd = execvp(*argv, argv);
-		if (id_cmd == -1 ) {
-			printf("execvp error! \n" );
-			exit(1);
-		}
-	} else {
-		while (wait(&status) != pid) {};
+		}		
+		execute_command(l);
 	}
 }
