@@ -10,6 +10,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <stdbool.h>
 
 #include "variante.h"
 #include "readcmd.h"
@@ -106,6 +107,12 @@ void remove_bg_process(pid_t pid) {
 void execute_command(struct cmdline *l) {
 	pid_t pid;
 	int status;
+	int first_pipe;
+
+	if (l->seq[1] != NULL) {
+		first_pipe = true;
+	}
+	(void) first_pipe; //temporary
 
 	pid = fork();
 	if (pid == 0) {
