@@ -39,7 +39,7 @@ struct cmdline {
 			   displayed. The other fields are null. */
 	char *in;	/* If not null : name of file for input redirection. */
 	char *out;	/* If not null : name of file for output redirection. */
-        int   bg;       /* If set the command must run in background */ 
+    int   bg;       /* If set the command must run in background */ 
 	char ***seq;	/* See comment below */
 };
 

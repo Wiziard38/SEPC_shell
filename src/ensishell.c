@@ -84,6 +84,24 @@ void add_bg_process(pid_t pid, char* command) {
 
 }
 
+void remove_bg_process(pid_t pid) {
+	process *current_process = bg_process_list;
+	process *previous_process = NULL;
+
+	if (current_process != NULL) {
+		if (current_process->process_id == pid) {
+			if (previous_process == NULL) {
+				bg_process_list = current_process->next_process;
+			} else {
+				previous_process->next_process = current_process->next_process;
+			}
+			free(current_process->process_cmd);
+			free(current_process);
+			return;
+		}
+	}
+}
+
 
 void execute_command(struct cmdline *l) {
 	pid_t pid;
@@ -174,7 +192,29 @@ int main() {
 					printf("'%s' ", cmd[j]);
 			}
 			printf("\n");
-		}		
-		execute_command(l);
+		}
+
+		if (strcmp(l->seq[0][0], "jobs") == 0) {
+			printf("========================= \n");
+			printf("Processes in background : \n");
+			process *current_process = bg_process_list;
+			pid_t pid;
+			int child_state;
+
+			if (current_process != NULL) {
+				if (waitpid(current_process->process_id, &child_state, WNOHANG)) {
+					pid = current_process->process_id;
+					current_process = current_process->next_process;
+					remove_bg_process(pid);
+				} else {
+					printf(" > Process %d : %s \n", current_process->process_id, current_process->process_cmd);
+					current_process = current_process->next_process;
+				}
+			}
+			printf("========================= \n");
+		
+		} else {
+			execute_command(l);
+		}	
 	}
 }
