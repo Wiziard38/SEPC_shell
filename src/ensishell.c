@@ -132,7 +132,7 @@ void execute_command(struct cmdline *l) {
     }
 
     if (l->out != NULL) {    
-        int output_fd = open(l->out, O_RDONLY);
+        int output_fd = open(l->out, O_WRONLY | O_CREAT);
         if (output_fd > -1) {
             dup2(output_fd, STDOUT_FILENO);
             close(output_fd);
