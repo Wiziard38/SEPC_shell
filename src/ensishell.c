@@ -161,6 +161,13 @@ void execute_command(struct cmdline *l) {
 		}
 	}
 
+    if (pipe_exists) {
+        if (close(pipefd[0]) == -1 || close(pipefd[1]) == -1 ) {
+            printf("Closing pipe error \n");
+            exit(0);
+		}
+    }
+
 
 	if(l->bg){
 		add_bg_process(pid, l->seq[0][0]);
