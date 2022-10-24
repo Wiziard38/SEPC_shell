@@ -136,7 +136,7 @@ void execute_command(struct cmdline *l) {
     // if >
     if (l->out != NULL) {  
         mode_t open_mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
-        int output_fd = open(l->out, O_RDWR | O_CREAT, open_mode);
+        int output_fd = open(l->out, O_RDWR | O_TRUNC | O_CREAT, open_mode);
         if (output_fd > -1) {
             dup2(output_fd, STDOUT_FILENO);
             close(output_fd);
