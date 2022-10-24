@@ -126,7 +126,7 @@ void execute_command(struct cmdline *l) {
 		if (pipe_exists) {
 			dup2(pipefd[0], 0);
 			if (close(pipefd[1]) == -1) {
-				printf{"Closing pipe error \n"};
+				printf("Closing pipe error \n");
 				exit(0);
 			}
 		}
@@ -138,7 +138,7 @@ void execute_command(struct cmdline *l) {
 		if (pipe_exists) {
 			dup2(pipefd[1], 1);
 			if (close(pipefd[0]) == -1) {
-				printf{"Closing pipe error \n"};
+				printf("Closing pipe error \n");
 				exit(0);
 			}
 
