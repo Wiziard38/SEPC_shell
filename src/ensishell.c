@@ -190,8 +190,7 @@ void execute_command(struct cmdline *l) {
 
     // if &
 	if(l->bg){
-		// add_bg_process(pid, l->seq[0][0]);
-		add_bg_process(pid, l->seq); //test
+		add_bg_process(pid, l->seq[0][0]);
 	} else {
 		int status = 0;
 		waitpid(pid, &status, 0);
