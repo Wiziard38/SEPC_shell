@@ -118,14 +118,13 @@ void execute_command(struct cmdline *l) {
 	}
 
 
-	pid = fork();
-	if (pid == -1) {
+	if ((pid = fork()) == -1) {
 		printf("Forking error \n");
 	} else if (pid == 0) {
 
 		if (pipe_exists) {
 			dup2(pipefd[0], 0);
-			if (close(pipefd[1]) == -1) {
+			if (close(pipefd[0]) == -1 || close(pipefd[1]) == -1 ) {
 				printf{"Closing pipe error \n"};
 				exit(0);
 			}
@@ -135,9 +134,23 @@ void execute_command(struct cmdline *l) {
 		printf("Execvp error! \n" );
 		exit(0);
 	} else {
-		if (pipe_exists) {
+		// if (pipe_exists) {
+		// 	dup2(pipefd[1], 1);
+		// 	if (close(pipefd[0]) == -1 || close(pipefd[1]) == -1 ) {
+		// 		printf{"Closing pipe error \n"};
+		// 		exit(0);
+		// 	}
+
+		// 	execvp(l->seq[1][0], l->seq[1]);
+		// 	printf("Execvp error! \n" );
+		// 	exit(0);
+		// }
+	}
+
+	if (pipe_exists) {
+		if (fork() == 0) {
 			dup2(pipefd[1], 1);
-			if (close(pipefd[0]) == -1) {
+			if (close(pipefd[0]) == -1 || close(pipefd[1]) == -1 ) {
 				printf{"Closing pipe error \n"};
 				exit(0);
 			}
@@ -147,7 +160,6 @@ void execute_command(struct cmdline *l) {
 			exit(0);
 		}
 	}
-
 
 
 	if(l->bg){
