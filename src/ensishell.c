@@ -203,6 +203,9 @@ void execute_command(struct cmdline *l) {
 		int status = 0;
 		waitpid(pid, &status, 0);
 	}
+
+    close(in_old);	 		
+	close(out_old);
 }
 
 
