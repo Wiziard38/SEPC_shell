@@ -82,7 +82,6 @@ void add_bg_process(pid_t pid, char* command) {
 		new_process->next_process = bg_process_list;
 		bg_process_list = new_process;
 	}
-
 }
 
 void remove_bg_process(pid_t pid) {
@@ -107,21 +106,49 @@ void remove_bg_process(pid_t pid) {
 void execute_command(struct cmdline *l) {
 	pid_t pid;
 	int status;
-	int first_pipe;
-
+	int pipe_exists;
+	int pipefd[2];
+	
 	if (l->seq[1] != NULL) {
-		first_pipe = true;
+		pipe_exists = true;
+		if (pipe(pipefd) == -1) {
+			printf("Piping error! \n");
+			exit(0);
+		};
 	}
-	(void) first_pipe; //temporary
+
 
 	pid = fork();
-	if (pid == 0) {
+	if (pid == -1) {
+		printf("Forking error \n");
+	} else if (pid == 0) {
+
+		if (pipe_exists) {
+			dup2(pipefd[0], 0);
+			if (close(pipefd[1]) == -1) {
+				printf{"Closing pipe error \n"};
+				exit(0);
+			}
+		}
+
 		execvp(l->seq[0][0], l->seq[0]);
-		printf("execvp error! \n" );
+		printf("Execvp error! \n" );
 		exit(0);
-	} else if (pid == -1) {
-		printf("forking error");
+	} else {
+		if (pipe_exists) {
+			dup2(pipefd[1], 1);
+			if (close(pipefd[0]) == -1) {
+				printf{"Closing pipe error \n"};
+				exit(0);
+			}
+
+			execvp(l->seq[1][0], l->seq[1]);
+			printf("Execvp error! \n" );
+			exit(0);
+		}
 	}
+
+
 
 	if(l->bg){
 		add_bg_process(pid, l->seq[0][0]);
@@ -212,7 +239,7 @@ int main() {
 				if (waitpid(current_process->process_id, &child_state, WNOHANG)) {
 					pid = current_process->process_id;
 					current_process = current_process->next_process;
-					remove_bg_process(pid);
+					remove_bg_process(pid); // replace pid with line ?
 				} else {
 					printf(" > Process %d : %s \n", current_process->process_id, current_process->process_cmd);
 					current_process = current_process->next_process;
