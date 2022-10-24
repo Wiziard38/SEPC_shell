@@ -128,9 +128,12 @@ void execute_command(struct cmdline *l) {
 				printf("Closing pipe error \n");
 				exit(0);
 			}
-		}
+            execvp(l->seq[1][0], l->seq[1]);
+		} else {
+            execvp(l->seq[0][0], l->seq[0]);
 
-		execvp(l->seq[0][0], l->seq[0]);
+        }
+
 		printf("Execvp error! \n" );
 		exit(0);
 	} else {
@@ -155,7 +158,7 @@ void execute_command(struct cmdline *l) {
 				exit(0);
 			}
 
-			execvp(l->seq[1][0], l->seq[1]);
+			execvp(l->seq[0][0], l->seq[0]);
 			printf("Execvp error! \n" );
 			exit(0);
 		}
