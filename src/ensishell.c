@@ -109,8 +109,8 @@ void execute_command(struct cmdline *l) {
 	pid_t pid;
 	int pipe_exists = false;
 	int pipefd[2];
-    int in_old = dup(STDIN_FILENO);
-	int out_old = dup(STDOUT_FILENO);
+    int old_input_fd = dup(STDIN_FILENO);
+	int old_output_fd = dup(STDOUT_FILENO);
 	
     // if |
 	if (l->seq[1] != NULL) {
@@ -197,8 +197,16 @@ void execute_command(struct cmdline *l) {
 		waitpid(pid, &status, 0);
 	}
 
-    close(in_old);	 		
-	close(out_old);
+    if (l->in != NULL) {
+        dup2(old_input_fd, STDIN_FILENO);
+    }
+
+    if (l->out != NULL) {
+        dup2(old_output_fd, STDOUT_FILENO);
+    }
+
+    close(old_input_fd);	 		
+	close(old_output_fd);
 }
 
 
