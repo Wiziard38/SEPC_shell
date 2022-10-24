@@ -112,6 +112,7 @@ void execute_command(struct cmdline *l) {
     int in_old = dup(STDIN_FILENO);
 	int out_old = dup(STDOUT_FILENO);
 	
+    // if |
 	if (l->seq[1] != NULL) {
 		pipe_exists = true;
 		if (pipe(pipefd) == -1) {
@@ -120,6 +121,7 @@ void execute_command(struct cmdline *l) {
 		};
 	}
 
+    // if <
     if (l->in != NULL) {
         int input_fd = open(l->in, O_RDWR);
         if (input_fd > -1) {
@@ -131,6 +133,7 @@ void execute_command(struct cmdline *l) {
         }
     }
 
+    // if >
     if (l->out != NULL) {    
         int output_fd = open(l->out, O_WRONLY | O_CREAT);
         if (output_fd > -1) {
@@ -148,7 +151,7 @@ void execute_command(struct cmdline *l) {
 	} else if (pid == 0) {
 
 		if (pipe_exists) {
-			dup2(pipefd[0], 0);
+			dup2(pipefd[0], STDIN_FILENO);
 			if (close(pipefd[0]) == -1 || close(pipefd[1]) == -1 ) {
 				printf("Closing pipe error \n");
 				exit(0);
@@ -156,28 +159,16 @@ void execute_command(struct cmdline *l) {
             execvp(l->seq[1][0], l->seq[1]);
 		} else {
             execvp(l->seq[0][0], l->seq[0]);
-
         }
 
 		printf("Execvp error! \n" );
 		exit(0);
-	} else {
-		// if (pipe_exists) {
-		// 	dup2(pipefd[1], 1);
-		// 	if (close(pipefd[0]) == -1 || close(pipefd[1]) == -1 ) {
-		// 		printf("Closing pipe error \n");
-		// 		exit(0);
-		// 	}
-
-		// 	execvp(l->seq[1][0], l->seq[1]);
-		// 	printf("Execvp error! \n" );
-		// 	exit(0);
-		// }
 	}
 
+    // if |
 	if (pipe_exists) {
 		if (fork() == 0) {
-			dup2(pipefd[1], 1);
+			dup2(pipefd[1], STDOUT_FILENO);
 			if (close(pipefd[0]) == -1 || close(pipefd[1]) == -1 ) {
 				printf("Closing pipe error \n");
 				exit(0);
@@ -189,6 +180,7 @@ void execute_command(struct cmdline *l) {
 		}
 	}
 
+    // if |
     if (pipe_exists) {
         if (close(pipefd[0]) == -1 || close(pipefd[1]) == -1 ) {
             printf("Closing pipe error \n");
@@ -196,9 +188,10 @@ void execute_command(struct cmdline *l) {
 		}
     }
 
-
+    // if &
 	if(l->bg){
-		add_bg_process(pid, l->seq[0][0]);
+		// add_bg_process(pid, l->seq[0][0]);
+		add_bg_process(pid, l->seq); //test
 	} else {
 		int status = 0;
 		waitpid(pid, &status, 0);
