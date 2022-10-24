@@ -11,6 +11,8 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <stdbool.h>
+#include <fcntl.h>
+
 
 #include "variante.h"
 #include "readcmd.h"
@@ -116,6 +118,28 @@ void execute_command(struct cmdline *l) {
 			exit(0);
 		};
 	}
+
+    if (l->in != NULL) {
+        int input_fd = open(l->in, O_RDWR);
+        if (input_fd > -1) {
+            dup2(input_fd, STDIN_FILENO);
+            close(input_fd);
+        } else {
+            printf("Opening file error! \n");
+            exit(0);
+        }
+    }
+
+    if (l->out != NULL) {    
+        int output_fd = open(l->out, O_RDONLY);
+        if (output_fd > -1) {
+            dup2(output_fd, STDOUT_FILENO);
+            close(output_fd);
+        } else {
+            printf("Opening file error! \n");
+            exit(0);
+        }
+    }
 
 
 	if ((pid = fork()) == -1) {
