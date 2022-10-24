@@ -108,7 +108,7 @@ void remove_bg_process(pid_t pid) {
 void execute_command(struct cmdline *l) {
 	pid_t pid;
 	int status;
-	int pipe_exists;
+	int pipe_exists = false;
 	int pipefd[2];
 	
 	if (l->seq[1] != NULL) {
