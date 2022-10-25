@@ -197,11 +197,11 @@ void execute_command(struct cmdline *l) {
 		waitpid(pid, &status, 0);
 	}
 
-    if (l->in != NULL | pipe_exists == true) {
+    if (l->in != NULL || pipe_exists == true) {
         dup2(old_input_fd, STDIN_FILENO);
     }
 
-    if (l->out != NULL | pipe_exists == true) {
+    if (l->out != NULL || pipe_exists == true) {
         dup2(old_output_fd, STDOUT_FILENO);
     }
 
