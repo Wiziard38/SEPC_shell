@@ -265,19 +265,19 @@ int main() {
 			continue;
 		}
 
-		if (l->in) printf("in: %s\n", l->in);
-		if (l->out) printf("out: %s\n", l->out);
-		if (l->bg) printf("background (&)\n");
+		// if (l->in) printf("in: %s\n", l->in);
+		// if (l->out) printf("out: %s\n", l->out);
+		// if (l->bg) printf("background (&)\n");
 
-		/* Display each command of the pipe */
-		for (i=0; l->seq[i]!=0; i++) {
-			char **cmd = l->seq[i];
-			printf("seq[%d]: ", i);
-			for (j=0; cmd[j]!=0; j++) {
-					printf("'%s' ", cmd[j]);
-			}
-			printf("\n");
-		}
+		// /* Display each command of the pipe */
+		// for (i=0; l->seq[i]!=0; i++) {
+		// 	char **cmd = l->seq[i];
+		// 	printf("seq[%d]: ", i);
+		// 	for (j=0; cmd[j]!=0; j++) {
+		// 			printf("'%s' ", cmd[j]);
+		// 	}
+		// 	printf("\n");
+		// }
 
 		if (strcmp(l->seq[0][0], "jobs") == 0) {
 			printf("========================= \n");
