@@ -222,7 +222,7 @@ int main() {
 	while (1) {
 		struct cmdline *l;
 		char *line=0;
-		int i, j;
+		// int i, j;
 		char *prompt = "ensishell>";
 
 		/* Readline use some internal memory structure that
