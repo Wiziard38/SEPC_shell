@@ -88,13 +88,19 @@ void remove_bg_process(pid_t pid) {
 	process *current_process = bg_process_list;
 	process *previous_process = NULL;
 
-	while (current_process != NULL) {
+	if (bg_process_list->process_id == pid) {
+		bg_process_list = bg_process_list->next_process;
+		free(current_process->process_cmd);
+		free(current_process);
+		return;
+	}
+
+	while (true) {
+		previous_process = current_process;
+		current_process = current_process->next_process;
+		
 		if (current_process->process_id == pid) {
-			if (previous_process == NULL) {
-				bg_process_list = current_process->next_process;
-			} else {
-				previous_process->next_process = current_process->next_process;
-			}
+			previous_process->next_process = current_process->next_process;
 			free(current_process->process_cmd);
 			free(current_process);
 			return;
