@@ -38,6 +38,18 @@ class Test2InOut < Minitest::Test
 
     def test_pipe
       @pty_write.puts("ls | wc -l")
+      puts
+      puts @pty_read.getc
+      puts @pty_read.getc
+      puts @pty_read.getc
+      puts @pty_read.getc
+      puts @pty_read.getc
+      puts @pty_read.getc
+      puts @pty_read.getc
+      puts @pty_read.getc
+      puts @pty_read.getc
+      puts @pty_read.getc
+
       a = @pty_read.expect(/^(\d+)\r\n/, DELAI)
       refute_nil(a, "sortie incohérente pour ls | wc -l")
     end

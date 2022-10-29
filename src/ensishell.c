@@ -66,48 +66,6 @@ void terminate(char *line) {
 	exit(0);
 }
 
-void add_bg_process(pid_t pid) {
-	struct process *new_process = malloc(sizeof(struct process));
-	new_process->process_id = pid;
-	new_process->process_cmd = malloc(sizeof(entered_command));
-	strcpy(new_process->process_cmd, entered_command);
-	new_process->next_process = NULL;
-
-	if (bg_process_list == NULL) {
-		bg_process_list = new_process;
-	} else {
-		struct process *current_process = bg_process_list;
-		while (current_process->next_process != NULL) {
-			current_process = current_process->next_process;	
-		}
-		current_process->next_process = new_process;
-	}
-}
-
-void remove_bg_process(pid_t pid) {
-	process *current_process = bg_process_list;
-	process *previous_process = NULL;
-
-	if (bg_process_list->process_id == pid) {
-		bg_process_list = bg_process_list->next_process;
-		free(current_process->process_cmd);
-		free(current_process);
-		return;
-	}
-
-	while (true) {
-		previous_process = current_process;
-		current_process = current_process->next_process;
-		
-		if (current_process->process_id == pid) {
-			previous_process->next_process = current_process->next_process;
-			free(current_process->process_cmd);
-			free(current_process);
-			return;
-		}
-	}
-}
-
 
 int main() {
         printf("Variante %d: %s\n", VARIANTE, VARIANTE_STRING);
@@ -292,4 +250,49 @@ void execute_command(struct cmdline *l) {
 
     close(old_input_fd);	 		
 	close(old_output_fd);
+}
+
+
+
+
+void add_bg_process(pid_t pid) {
+	struct process *new_process = malloc(sizeof(struct process));
+	new_process->process_id = pid;
+	new_process->process_cmd = malloc(sizeof(entered_command));
+	strcpy(new_process->process_cmd, entered_command);
+	new_process->next_process = NULL;
+
+	if (bg_process_list == NULL) {
+		bg_process_list = new_process;
+	} else {
+		struct process *current_process = bg_process_list;
+		while (current_process->next_process != NULL) {
+			current_process = current_process->next_process;	
+		}
+		current_process->next_process = new_process;
+	}
+}
+
+void remove_bg_process(pid_t pid) {
+	process *current_process = bg_process_list;
+	process *previous_process = NULL;
+
+	if (bg_process_list->process_id == pid) {
+		bg_process_list = bg_process_list->next_process;
+		free(current_process->process_cmd);
+		free(current_process);
+		return;
+	}
+
+	while (true) {
+		previous_process = current_process;
+		current_process = current_process->next_process;
+		
+		if (current_process->process_id == pid) {
+			previous_process->next_process = current_process->next_process;
+			free(current_process->process_cmd);
+			free(current_process);
+			return;
+		}
+	}
 }
