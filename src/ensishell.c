@@ -131,12 +131,12 @@ int main() {
 
 			while (current_process != NULL) {
 				if (waitpid(current_process->process_id, &child_state, WNOHANG)) {
-					printf("[%d]   Done                        %s \n", current_process->process_id, current_process->process_cmd);
+					printf("[%d]   Done%-18s\n", current_process->process_id, current_process->process_cmd);
 					pid = current_process->process_id;
 					current_process = current_process->next_process;
 					remove_bg_process(pid);
 				} else {
-					printf("[%d]   Running                     %s \n", current_process->process_id, current_process->process_cmd);
+					printf("[%d]   Running%-15s\n", current_process->process_id, current_process->process_cmd);
 					current_process = current_process->next_process;
 				}
 			}		
