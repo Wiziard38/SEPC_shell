@@ -150,28 +150,27 @@ int main() {
 
 void execute_command(struct cmdline *l) {
 	pid_t pid;
-	int status;
+	int status, i;
+	int current_cmd_index = 0;
 
-	int i, current_cmd_index = 0;
 	int nb_pipes = count_pipes(l);
-	bool pipe_exists = (nb_pipes != 0);
 	int pipefd[nb_pipes][2];
 
     int old_input_fd = dup(STDIN_FILENO);
 	int old_output_fd = dup(STDOUT_FILENO);
-
-    // if pipe(s)
-	if (pipe_exists) {
-		for (i = 0; i < nb_pipes; i++) {
-			if (pipe(pipefd[i]) == -1) {
-				perror("Piping error");
-				exit(EXIT_FAILURE);
-			}
+    
+	
+	// if pipe(s)
+	for (i = 0; i < nb_pipes; i++) {
+		if (pipe(pipefd[i]) == -1) {
+			perror("Piping error");
+			exit(EXIT_FAILURE);
 		}
 	}
 
+
     // if <
-    if (l->in != NULL) {
+    if (l->in) {
         int input_fd = open(l->in, O_RDWR);
         if (input_fd > -1) {
             dup2(input_fd, STDIN_FILENO);
@@ -183,7 +182,7 @@ void execute_command(struct cmdline *l) {
     }
 
     // if >
-    if (l->out != NULL) {
+    if (l->out) {
         mode_t open_mode = S_IRUSR | S_IXUSR | S_IWUSR | S_IRGRP | S_IROTH;
         int output_fd = open(l->out, O_RDWR | O_TRUNC | O_CREAT, open_mode);
         if (output_fd > -1) {
@@ -196,95 +195,75 @@ void execute_command(struct cmdline *l) {
     }
 
 
+	while (current_cmd_index <= nb_pipes) {
 
-	if (!pipe_exists) {
 		if ((pid = fork()) == -1) {
 			perror("Forking error");
 			exit(EXIT_FAILURE);
-		} else if (pid == 0) {
-			execvp(l->seq[0][0], l->seq[0]);
-			perror("Execvp error");
+
+		} else if (pid == 0) { // in child
+
+			// If not first command of pipe
+			if (current_cmd_index != 0) {
+				if (dup2(pipefd[current_cmd_index - 1][STDIN_FILENO], STDIN_FILENO) == -1) {
+					perror("Duping error");
+					exit(EXIT_FAILURE);
+				}
+			}
+			
+			// If not last command of pipe
+			if (current_cmd_index != nb_pipes) {
+				if (dup2(pipefd[current_cmd_index][STDOUT_FILENO], STDOUT_FILENO) == -1) {
+					perror("Duping error");
+					exit(EXIT_FAILURE);
+				}
+			}
+
+			for (i = 0; i < nb_pipes; i++) {
+				if ((close(pipefd[i][0]) == -1) || (close(pipefd[i][1]) == -1)) {
+					perror("Closing pipe error");
+					exit(EXIT_FAILURE);
+				}
+			}
+			
+			execvp(l->seq[current_cmd_index][0], l->seq[current_cmd_index]);
+			perror("Execvp error" );
 			exit(EXIT_FAILURE);
-		} else {
-			if(l->bg){
-				add_bg_process(pid);
-			} else {
-				wait(&status);
-			}
 		}
+		current_cmd_index++;
+	}
 
 
-	} else {
-		while (current_cmd_index <= nb_pipes) {
-
-			if ((pid = fork()) == -1) {
-				perror("Forking error");
-				exit(EXIT_FAILURE);
-
-			} else if (pid == 0) { // in child
-
-				// If not first command of pipe
-				if (current_cmd_index != 0) {
-					if (dup2(pipefd[current_cmd_index - 1][STDIN_FILENO], STDIN_FILENO) == -1) {
-						perror("Duping error");
-						exit(EXIT_FAILURE);
-					}
-				}
-				
-				// If not last command of pipe
-				if (current_cmd_index != nb_pipes) {
-					if (dup2(pipefd[current_cmd_index][STDOUT_FILENO], STDOUT_FILENO) == -1) {
-						perror("Duping error");
-						exit(EXIT_FAILURE);
-					}
-				}
-
-				for (i = 0; i < nb_pipes; i++) {
-					if ((close(pipefd[i][0]) == -1) || (close(pipefd[i][1]) == -1)) {
-						perror("Closing pipe error");
-						exit(EXIT_FAILURE);
-					}
-				}
-				
-				execvp(l->seq[current_cmd_index][0], l->seq[current_cmd_index]);
-				perror("Execvp error" );
-				exit(EXIT_FAILURE);
-			}
-			current_cmd_index++;
-		}
-
-		for (i = 0; i < nb_pipes; i++) {
-			if ((close(pipefd[i][0]) == -1) || (close(pipefd[i][1]) == -1)) {
-				perror("Closing pipe error");
-				exit(EXIT_FAILURE);
-			}
-		}
-
-		if(l->bg){
-			add_bg_process(pid);
-		} else {
-			for (i = 0; i < 2*nb_pipes; i++) {
-				wait(&status);
-			}
+	for (i = 0; i < nb_pipes; i++) {
+		if ((close(pipefd[i][0]) == -1) || (close(pipefd[i][1]) == -1)) {
+			perror("Closing pipe error");
+			exit(EXIT_FAILURE);
 		}
 	}
 
 
-	// Link back standard in and out
-    if (l->in != NULL || pipe_exists) {
+	if(l->bg){
+		add_bg_process(pid);
+	} else {
+		for (i = 0; i <= nb_pipes; i++) {
+			wait(&status); // wait for all process to finish
+		}
+	}
+
+
+	// Link back standard input and output
+    if (l->in || nb_pipes) {
         if (dup2(old_input_fd, STDIN_FILENO) == -1) {
 			perror("Duping error");
 			exit(EXIT_FAILURE);
 		}
     }
-
-    if (l->out != NULL || pipe_exists) {
+    if (l->out || nb_pipes) {
         if (dup2(old_output_fd, STDOUT_FILENO) == -1) {
 			perror("Duping error");
 			exit(EXIT_FAILURE);
 		}
     }
-
 	if ((close(old_input_fd) == -1) || (close(old_output_fd) == -1)) {
 		perror("Closing pipe error");
 		exit(EXIT_FAILURE);
