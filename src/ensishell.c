@@ -44,7 +44,7 @@ int question6_executer(char *line)
 	 */
 
 	execute_command(parsecmd(&line));
-	
+
 	return 0;
 }
 
@@ -112,10 +112,10 @@ int main() {
 
 		/* If input stream closed, normal termination */
 		if (!l) {
-		  
+
 			terminate(0);
 		}
-		
+
 		if (l->err) {
 			/* Syntax error, read another command */
 			printf("error: %s\n", l->err);
@@ -131,18 +131,18 @@ int main() {
 
 			while (current_process != NULL) {
 				if (waitpid(current_process->process_id, &child_state, WNOHANG)) {
-					printf("[%d]   Done%-18s\n", current_process->process_id, current_process->process_cmd);
+					printf("[%d]   Done%18s%s\n", current_process->process_id, "", current_process->process_cmd);
 					pid = current_process->process_id;
 					current_process = current_process->next_process;
 					remove_bg_process(pid);
 				} else {
-					printf("[%d]   Running%-15s\n", current_process->process_id, current_process->process_cmd);
+					printf("[%d]   Running%15s%s\n", current_process->process_id, "", current_process->process_cmd);
 					current_process = current_process->next_process;
 				}
-			}		
+			}
 		} else {
 			execute_command(l);
-		}	
+		}
 	}
 }
 
@@ -156,7 +156,7 @@ void execute_command(struct cmdline *l) {
 	int pipefd[2];
     int old_input_fd = dup(STDIN_FILENO);
 	int old_output_fd = dup(STDOUT_FILENO);
-	
+
     // if |
 	if (l->seq[1] != NULL) {
 		pipe_exists = true;
@@ -179,7 +179,7 @@ void execute_command(struct cmdline *l) {
     }
 
     // if >
-    if (l->out != NULL) {  
+    if (l->out != NULL) {
         mode_t open_mode = S_IRUSR | S_IXUSR | S_IWUSR | S_IRGRP | S_IROTH;
         int output_fd = open(l->out, O_RDWR | O_TRUNC | O_CREAT, open_mode);
         if (output_fd > -1) {
@@ -248,7 +248,7 @@ void execute_command(struct cmdline *l) {
         dup2(old_output_fd, STDOUT_FILENO);
     }
 
-    close(old_input_fd);	 		
+    close(old_input_fd);
 	close(old_output_fd);
 }
 
@@ -267,7 +267,7 @@ void add_bg_process(pid_t pid) {
 	} else {
 		struct process *current_process = bg_process_list;
 		while (current_process->next_process != NULL) {
-			current_process = current_process->next_process;	
+			current_process = current_process->next_process;
 		}
 		current_process->next_process = new_process;
 	}
@@ -287,7 +287,7 @@ void remove_bg_process(pid_t pid) {
 	while (true) {
 		previous_process = current_process;
 		current_process = current_process->next_process;
-		
+
 		if (current_process->process_id == pid) {
 			previous_process->next_process = current_process->next_process;
 			free(current_process->process_cmd);
