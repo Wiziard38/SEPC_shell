@@ -15,4 +15,6 @@ void remove_bg_process(pid_t pid);
 
 void execute_command(struct cmdline *l);
 
+int16_t count_pipes(struct cmdline *l);
+
 #endif

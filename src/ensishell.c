@@ -154,15 +154,16 @@ void execute_command(struct cmdline *l) {
 	pid_t pid;
 	int pipe_exists = false;
 	int pipefd[2];
+
     int old_input_fd = dup(STDIN_FILENO);
 	int old_output_fd = dup(STDOUT_FILENO);
 
-    // if |
+    // if pipe(s)
 	if (l->seq[1] != NULL) {
 		pipe_exists = true;
 		if (pipe(pipefd) == -1) {
 			perror("Piping error");
-			exit(0);
+			exit(EXIT_FAILURE);
 		};
 	}
 
@@ -174,7 +175,7 @@ void execute_command(struct cmdline *l) {
             close(input_fd);
         } else {
             perror("Opening file error");
-            exit(0);
+            exit(EXIT_FAILURE);
         }
     }
 
@@ -187,7 +188,7 @@ void execute_command(struct cmdline *l) {
             close(output_fd);
         } else {
             perror("Opening file error");
-            exit(0);
+            exit(EXIT_FAILURE);
         }
     }
 
@@ -199,15 +200,15 @@ void execute_command(struct cmdline *l) {
 			dup2(pipefd[0], STDIN_FILENO);
 			if (close(pipefd[1]) == -1 || close(pipefd[0]) == -1 ) {
 				perror("Closing pipe error");
-				exit(0);
+				exit(EXIT_FAILURE);
 			}
 			execvp(l->seq[1][0], l->seq[1]);
 			perror("Execvp error" );
-			exit(0);
+			exit(EXIT_FAILURE);
 		} else {
 			execvp(l->seq[0][0], l->seq[0]);
 			perror("Execvp error");
-			exit(0);
+			exit(EXIT_FAILURE);
 		}
 	} else { // in parent
 		if (pipe_exists) {
@@ -217,16 +218,16 @@ void execute_command(struct cmdline *l) {
 				dup2(pipefd[1], STDOUT_FILENO);
 				if (close(pipefd[0]) == -1 || close(pipefd[1]) == -1 ) {
 					perror("Closing pipe error");
-					exit(0);
+					exit(EXIT_FAILURE);
 				}
 
 				execvp(l->seq[0][0], l->seq[0]);
 				perror("Execvp error");
-				exit(0);
+				exit(EXIT_FAILURE);
 			} else { // in second parent
 				if (close(pipefd[0]) == -1 || close(pipefd[1]) == -1 ) {
 					perror("Closing pipe error");
-					exit(0);
+					exit(EXIT_FAILURE);
 				}
 			}
 		}
@@ -295,4 +296,13 @@ void remove_bg_process(pid_t pid) {
 			return;
 		}
 	}
+}
+
+
+int16_t count_pipes(struct cmdline *l) {
+	int16_t nb_pipes = 0;
+	while (l->seq[nb_pipes] != NULL) {
+		nb_pipes++;
+	}
+	return nb_pipes + 1;
 }
