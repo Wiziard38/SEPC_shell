@@ -10,9 +10,11 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <sys/time.h>
 #include <stdbool.h>
 #include <fcntl.h>
 #include "ensishell.h"
+#include <signal.h>
 
 #include "variante.h"
 #include "readcmd.h"
@@ -22,7 +24,7 @@
 #endif
 
 
-struct process *bg_process_list = NULL;
+struct linked_process *bg_process_list = NULL;
 
 static char entered_command[100];
 
@@ -125,7 +127,7 @@ int main() {
 		if (*l->seq == NULL) {
 			// pass
 		} else if (strcmp(l->seq[0][0], "jobs") == 0) {
-			process *current_process = bg_process_list;
+			struct linked_process *current_process = bg_process_list;
 			pid_t pid;
 			int child_state;
 
@@ -158,8 +160,9 @@ void execute_command(struct cmdline *l) {
 
     int old_input_fd = dup(STDIN_FILENO);
 	int old_output_fd = dup(STDOUT_FILENO);
-    
-	
+
+	struct sigaction sa;
+
 	// if pipe(s)
 	for (i = 0; i < nb_pipes; i++) {
 		if (pipe(pipefd[i]) == -1) {
@@ -197,38 +200,44 @@ void execute_command(struct cmdline *l) {
 
 	while (current_cmd_index <= nb_pipes) {
 
-		if ((pid = fork()) == -1) {
-			perror("Forking error");
-			exit(EXIT_FAILURE);
+		if (l->bg) {
+			sa.sa_sigaction = sig_handler;
+			sa.sa_flags = SA_RESTART | SA_SIGINFO;
+			sigaction(SIGCHLD, &sa, NULL);
+		}
 
-		} else if (pid == 0) { // in child
+		switch (pid = fork()) {
+			case -1:
+				perror("Forking error");
+				exit(EXIT_FAILURE);
 
-			// If not first command of pipe
-			if (current_cmd_index != 0) {
-				if (dup2(pipefd[current_cmd_index - 1][STDIN_FILENO], STDIN_FILENO) == -1) {
-					perror("Duping error");
-					exit(EXIT_FAILURE);
+			case 0:
+				// If not first command of pipe
+				if (current_cmd_index != 0) {
+					if (dup2(pipefd[current_cmd_index - 1][STDIN_FILENO], STDIN_FILENO) == -1) {
+						perror("Duping error");
+						exit(EXIT_FAILURE);
+					}
 				}
-			}
-			
-			// If not last command of pipe
-			if (current_cmd_index != nb_pipes) {
-				if (dup2(pipefd[current_cmd_index][STDOUT_FILENO], STDOUT_FILENO) == -1) {
-					perror("Duping error");
-					exit(EXIT_FAILURE);
-				}
-			}
 
-			for (i = 0; i < nb_pipes; i++) {
-				if ((close(pipefd[i][0]) == -1) || (close(pipefd[i][1]) == -1)) {
-					perror("Closing pipe error");
-					exit(EXIT_FAILURE);
+				// If not last command of pipe
+				if (current_cmd_index != nb_pipes) {
+					if (dup2(pipefd[current_cmd_index][STDOUT_FILENO], STDOUT_FILENO) == -1) {
+						perror("Duping error");
+						exit(EXIT_FAILURE);
+					}
 				}
-			}
-			
-			execvp(l->seq[current_cmd_index][0], l->seq[current_cmd_index]);
-			perror("Execvp error" );
-			exit(EXIT_FAILURE);
+
+				for (i = 0; i < nb_pipes; i++) {
+					if ((close(pipefd[i][0]) == -1) || (close(pipefd[i][1]) == -1)) {
+						perror("Closing pipe error");
+						exit(EXIT_FAILURE);
+					}
+				}
+
+				execvp(l->seq[current_cmd_index][0], l->seq[current_cmd_index]);
+				perror("Execvp error");
+				exit(EXIT_FAILURE);		
 		}
 		current_cmd_index++;
 	}
@@ -242,8 +251,13 @@ void execute_command(struct cmdline *l) {
 	}
 
 
-	if(l->bg){
-		add_bg_process(pid);
+	if(l->bg) {
+		struct timeval current_time;
+		if (gettimeofday(&current_time, NULL) == -1) {
+			perror("accessing time");
+			exit(EXIT_FAILURE);
+		};
+		add_bg_process(pid, current_time);
 	} else {
 		for (i = 0; i <= nb_pipes; i++) {
 			wait(&status); // wait for all process to finish
@@ -271,9 +285,10 @@ void execute_command(struct cmdline *l) {
 }
 
 
-void add_bg_process(pid_t pid) {
-	struct process *new_process = malloc(sizeof(struct process));
+void add_bg_process(pid_t pid, struct timeval start_time) {
+	struct linked_process *new_process = malloc(sizeof(struct linked_process));
 	new_process->process_id = pid;
+	new_process->start_time = start_time;
 	new_process->process_cmd = malloc(sizeof(entered_command));
 	strcpy(new_process->process_cmd, entered_command);
 	new_process->next_process = NULL;
@@ -281,7 +296,7 @@ void add_bg_process(pid_t pid) {
 	if (bg_process_list == NULL) {
 		bg_process_list = new_process;
 	} else {
-		struct process *current_process = bg_process_list;
+		struct linked_process *current_process = bg_process_list;
 		while (current_process->next_process != NULL) {
 			current_process = current_process->next_process;
 		}
@@ -290,8 +305,8 @@ void add_bg_process(pid_t pid) {
 }
 
 void remove_bg_process(pid_t pid) {
-	process *current_process = bg_process_list;
-	process *previous_process = NULL;
+	struct linked_process *current_process = bg_process_list;
+	struct linked_process *previous_process = NULL;
 
 	if (bg_process_list->process_id == pid) {
 		bg_process_list = bg_process_list->next_process;
@@ -319,4 +334,25 @@ int count_pipes(struct cmdline *l) {
 		nb_pipes++;
 	}
 	return nb_pipes - 1;
+}
+
+void sig_handler(int sig, siginfo_t *info, void *secret) {
+	struct timeval current_time;
+	if (gettimeofday(&current_time, NULL) == -1) {
+		perror("accessing time");
+		exit(EXIT_FAILURE);
+	};
+
+	struct linked_process *current_process = bg_process_list;
+	while (1) {
+		if (current_process->process_id == info->si_pid) {
+			break;
+		}
+		current_process = current_process->next_process;
+	}
+
+	time_t seconds = current_time.tv_sec - current_process->start_time.tv_sec;
+	suseconds_t microseconds = current_time.tv_usec - current_process->start_time.tv_usec;
+
+	printf("\nExecution time for \"%s\" : %li,%06li seconds\n", current_process->process_cmd, seconds, microseconds);
 }
