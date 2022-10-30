@@ -35,8 +35,7 @@ static char entered_command[100];
 #if USE_GUILE == 1
 #include <libguile.h>
 
-int question6_executer(char *line)
-{
+int question6_executer(char *line) {
 	/* Question 6: Insert your code to execute the command line
 	 * identically to the standard execution scheme:
 	 * parsecmd, then fork+execvp, for a single command.
@@ -48,8 +47,7 @@ int question6_executer(char *line)
 	return 0;
 }
 
-SCM executer_wrapper(SCM x)
-{
+SCM executer_wrapper(SCM x) {
         return scm_from_int(question6_executer(scm_to_locale_stringn(x, 0)));
 }
 #endif
@@ -61,7 +59,7 @@ void terminate(char *line) {
 	clear_history();
 #endif
 	if (line)
-	  free(line);
+		free(line);
 	printf("exit\n");
 	exit(0);
 }
@@ -92,7 +90,9 @@ int main() {
 		}
 
 #if USE_GNU_READLINE == 1
-		add_history(line);
+		if (strcmp(line, "") != 0) {
+			add_history(line);
+		}
 #endif
 
 
@@ -148,27 +148,29 @@ int main() {
 
 
 
-
-
 void execute_command(struct cmdline *l) {
 	pid_t pid;
-	int pipe_exists = false;
-	int pipefd[2];
+	int status, i;
+	int current_cmd_index = 0;
+
+	int nb_pipes = count_pipes(l);
+	int pipefd[nb_pipes][2];
 
     int old_input_fd = dup(STDIN_FILENO);
 	int old_output_fd = dup(STDOUT_FILENO);
-
-    // if pipe(s)
-	if (l->seq[1] != NULL) {
-		pipe_exists = true;
-		if (pipe(pipefd) == -1) {
+    
+	
+	// if pipe(s)
+	for (i = 0; i < nb_pipes; i++) {
+		if (pipe(pipefd[i]) == -1) {
 			perror("Piping error");
 			exit(EXIT_FAILURE);
-		};
+		}
 	}
 
+
     // if <
-    if (l->in != NULL) {
+    if (l->in) {
         int input_fd = open(l->in, O_RDWR);
         if (input_fd > -1) {
             dup2(input_fd, STDIN_FILENO);
@@ -180,7 +182,7 @@ void execute_command(struct cmdline *l) {
     }
 
     // if >
-    if (l->out != NULL) {
+    if (l->out) {
         mode_t open_mode = S_IRUSR | S_IXUSR | S_IWUSR | S_IRGRP | S_IROTH;
         int output_fd = open(l->out, O_RDWR | O_TRUNC | O_CREAT, open_mode);
         if (output_fd > -1) {
@@ -193,67 +195,80 @@ void execute_command(struct cmdline *l) {
     }
 
 
-	if ((pid = fork()) == -1) {
-		perror("Forking error");
-	} else if (pid == 0) { // in child
-		if (pipe_exists) {
-			dup2(pipefd[0], STDIN_FILENO);
-			if (close(pipefd[1]) == -1 || close(pipefd[0]) == -1 ) {
-				perror("Closing pipe error");
-				exit(EXIT_FAILURE);
+	while (current_cmd_index <= nb_pipes) {
+
+		if ((pid = fork()) == -1) {
+			perror("Forking error");
+			exit(EXIT_FAILURE);
+
+		} else if (pid == 0) { // in child
+
+			// If not first command of pipe
+			if (current_cmd_index != 0) {
+				if (dup2(pipefd[current_cmd_index - 1][STDIN_FILENO], STDIN_FILENO) == -1) {
+					perror("Duping error");
+					exit(EXIT_FAILURE);
+				}
 			}
-			execvp(l->seq[1][0], l->seq[1]);
+			
+			// If not last command of pipe
+			if (current_cmd_index != nb_pipes) {
+				if (dup2(pipefd[current_cmd_index][STDOUT_FILENO], STDOUT_FILENO) == -1) {
+					perror("Duping error");
+					exit(EXIT_FAILURE);
+				}
+			}
+
+			for (i = 0; i < nb_pipes; i++) {
+				if ((close(pipefd[i][0]) == -1) || (close(pipefd[i][1]) == -1)) {
+					perror("Closing pipe error");
+					exit(EXIT_FAILURE);
+				}
+			}
+			
+			execvp(l->seq[current_cmd_index][0], l->seq[current_cmd_index]);
 			perror("Execvp error" );
 			exit(EXIT_FAILURE);
-		} else {
-			execvp(l->seq[0][0], l->seq[0]);
-			perror("Execvp error");
+		}
+		current_cmd_index++;
+	}
+
+
+	for (i = 0; i < nb_pipes; i++) {
+		if ((close(pipefd[i][0]) == -1) || (close(pipefd[i][1]) == -1)) {
+			perror("Closing pipe error");
 			exit(EXIT_FAILURE);
-		}
-	} else { // in parent
-		if (pipe_exists) {
-			if ((pid = fork()) == -1) {
-				perror("Forking error");
-			} else if (pid == 0) { // in second child
-				dup2(pipefd[1], STDOUT_FILENO);
-				if (close(pipefd[0]) == -1 || close(pipefd[1]) == -1 ) {
-					perror("Closing pipe error");
-					exit(EXIT_FAILURE);
-				}
-
-				execvp(l->seq[0][0], l->seq[0]);
-				perror("Execvp error");
-				exit(EXIT_FAILURE);
-			} else { // in second parent
-				if (close(pipefd[0]) == -1 || close(pipefd[1]) == -1 ) {
-					perror("Closing pipe error");
-					exit(EXIT_FAILURE);
-				}
-			}
-		}
-
-		// wait for process to finish or add to background
-		if(l->bg){
-			add_bg_process(pid);
-		} else {
-			int status = 0;
-			waitpid(pid, &status, 0);
 		}
 	}
 
-	// Link back standard in and out
-    if (l->in != NULL || pipe_exists == true) {
-        dup2(old_input_fd, STDIN_FILENO);
-    }
-    if (l->out != NULL || pipe_exists == true) {
-        dup2(old_output_fd, STDOUT_FILENO);
-    }
 
-    close(old_input_fd);
-	close(old_output_fd);
+	if(l->bg){
+		add_bg_process(pid);
+	} else {
+		for (i = 0; i <= nb_pipes; i++) {
+			wait(&status); // wait for all process to finish
+		}
+	}
+
+
+	// Link back standard input and output
+    if (l->in || nb_pipes) {
+        if (dup2(old_input_fd, STDIN_FILENO) == -1) {
+			perror("Duping error");
+			exit(EXIT_FAILURE);
+		}
+    }
+    if (l->out || nb_pipes) {
+        if (dup2(old_output_fd, STDOUT_FILENO) == -1) {
+			perror("Duping error");
+			exit(EXIT_FAILURE);
+		}
+    }
+	if ((close(old_input_fd) == -1) || (close(old_output_fd) == -1)) {
+		perror("Closing pipe error");
+		exit(EXIT_FAILURE);
+	}
 }
-
-
 
 
 void add_bg_process(pid_t pid) {
@@ -298,11 +313,10 @@ void remove_bg_process(pid_t pid) {
 	}
 }
 
-
-int16_t count_pipes(struct cmdline *l) {
-	int16_t nb_pipes = 0;
+int count_pipes(struct cmdline *l) {
+	int nb_pipes = 0;
 	while (l->seq[nb_pipes] != NULL) {
 		nb_pipes++;
 	}
-	return nb_pipes + 1;
+	return nb_pipes - 1;
 }
