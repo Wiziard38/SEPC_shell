@@ -13,9 +13,9 @@
 #include <sys/time.h>
 #include <stdbool.h>
 #include <fcntl.h>
-#include "ensishell.h"
 #include <signal.h>
 
+#include "ensishell.h"
 #include "variante.h"
 #include "readcmd.h"
 
@@ -75,11 +75,16 @@ int main() {
         /* register "executer" function in scheme */
         scm_c_define_gsubr("executer", 1, 0, 0, executer_wrapper);
 #endif
-
+	
+	struct sigaction sa;
+	sa.sa_sigaction = sig_handler;
+	sa.sa_flags = SA_SIGINFO | SA_NOCLDWAIT;
+	sigaction(SIGCHLD, &sa, NULL);
+	
 	while (1) {
 		struct cmdline *l;
 		char *line=0;
-		// int i, j;
+
 		char *prompt = "ensishell$ ";
 
 		/* Readline use some internal memory structure that
@@ -96,7 +101,6 @@ int main() {
 			add_history(line);
 		}
 #endif
-
 
 #if USE_GUILE == 1
 		/* The line is a scheme command */
@@ -149,7 +153,6 @@ int main() {
 }
 
 
-
 void execute_command(struct cmdline *l) {
 	pid_t pid;
 	int status, i;
@@ -161,8 +164,6 @@ void execute_command(struct cmdline *l) {
     int old_input_fd = dup(STDIN_FILENO);
 	int old_output_fd = dup(STDOUT_FILENO);
 
-	struct sigaction sa;
-
 	// if pipe(s)
 	for (i = 0; i < nb_pipes; i++) {
 		if (pipe(pipefd[i]) == -1) {
@@ -171,8 +172,7 @@ void execute_command(struct cmdline *l) {
 		}
 	}
 
-
-    // if <
+    // if input
     if (l->in) {
         int input_fd = open(l->in, O_RDWR);
         if (input_fd > -1) {
@@ -184,7 +184,7 @@ void execute_command(struct cmdline *l) {
         }
     }
 
-    // if >
+    // if output
     if (l->out) {
         mode_t open_mode = S_IRUSR | S_IXUSR | S_IWUSR | S_IRGRP | S_IROTH;
         int output_fd = open(l->out, O_RDWR | O_TRUNC | O_CREAT, open_mode);
@@ -199,12 +199,6 @@ void execute_command(struct cmdline *l) {
 
 
 	while (current_cmd_index <= nb_pipes) {
-
-		if (l->bg) {
-			sa.sa_sigaction = sig_handler;
-			sa.sa_flags = SA_RESTART | SA_SIGINFO;
-			sigaction(SIGCHLD, &sa, NULL);
-		}
 
 		switch (pid = fork()) {
 			case -1:
@@ -237,7 +231,7 @@ void execute_command(struct cmdline *l) {
 
 				execvp(l->seq[current_cmd_index][0], l->seq[current_cmd_index]);
 				perror("Execvp error");
-				exit(EXIT_FAILURE);		
+				exit(EXIT_FAILURE);
 		}
 		current_cmd_index++;
 	}
@@ -251,13 +245,14 @@ void execute_command(struct cmdline *l) {
 	}
 
 
-	if(l->bg) {
+	if (l->bg) {
 		struct timeval current_time;
 		if (gettimeofday(&current_time, NULL) == -1) {
-			perror("accessing time");
+			perror("Accessing time");
 			exit(EXIT_FAILURE);
 		};
 		add_bg_process(pid, current_time);
+
 	} else {
 		for (i = 0; i <= nb_pipes; i++) {
 			wait(&status); // wait for all process to finish
@@ -302,7 +297,7 @@ void add_bg_process(pid_t pid, struct timeval start_time) {
 		}
 		current_process->next_process = new_process;
 	}
-}
+}	
 
 void remove_bg_process(pid_t pid) {
 	struct linked_process *current_process = bg_process_list;
@@ -337,22 +332,38 @@ int count_pipes(struct cmdline *l) {
 }
 
 void sig_handler(int sig, siginfo_t *info, void *secret) {
+	
+	// Get current time
 	struct timeval current_time;
 	if (gettimeofday(&current_time, NULL) == -1) {
-		perror("accessing time");
+		perror("Accessing time");
 		exit(EXIT_FAILURE);
 	};
 
+	// Get if matching pid
 	struct linked_process *current_process = bg_process_list;
-	while (1) {
+	while (current_process != NULL) {
 		if (current_process->process_id == info->si_pid) {
 			break;
 		}
 		current_process = current_process->next_process;
 	}
+	
+	// If matching pid
+	if (current_process != NULL) {
+		time_t seconds = current_time.tv_sec - current_process->start_time.tv_sec;
+		suseconds_t microseconds = current_time.tv_usec - current_process->start_time.tv_usec;
 
-	time_t seconds = current_time.tv_sec - current_process->start_time.tv_sec;
-	suseconds_t microseconds = current_time.tv_usec - current_process->start_time.tv_usec;
-
-	printf("\nExecution time for \"%s\" : %li,%06li seconds\n", current_process->process_cmd, seconds, microseconds);
+		char *buf;
+		size_t sz;
+		sz = snprintf(NULL, 0, "\nExecution time for \"%s\" : %li,%06li seconds\n", current_process->process_cmd, seconds, microseconds);
+		buf = (char *)malloc(sz + 1); /* make sure you check for != NULL in real code */
+		snprintf(buf, sz+1, "\nExecution time for \"%s\" : %li,%06li seconds\n", current_process->process_cmd, seconds, microseconds);
+		if (write(STDOUT_FILENO, buf, sz - 1) == -1) {
+			perror("Writing on shell error!");
+			exit(EXIT_FAILURE);
+		}
+	
+		remove_bg_process(current_process->process_id);
+	}
 }
