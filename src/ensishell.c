@@ -228,7 +228,7 @@ void execute_command(struct cmdline *l) {
 					}
 				}
 
-				// Close alle pipes
+				// Close all pipes
 				for (i = 0; i < nb_pipes; i++) {
 					if ((close(pipefd[i][0]) == -1) || (close(pipefd[i][1]) == -1)) {
 						perror("Closing pipe error");
@@ -344,7 +344,7 @@ int count_pipes(struct cmdline *l) {
 }
 
 void sig_handler(int sig, siginfo_t *info, void *secret) {
-	/* Function taht handles when a child process is finished */
+	/* Function that handles when a child process is finished */
 	
 	// Get current time
 	struct timeval current_time;
