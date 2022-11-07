@@ -154,6 +154,9 @@ int main() {
 
 
 void execute_command(struct cmdline *l) {
+	/* Function that will execute the command typed in by the user. 
+	If there are no problems, the command is executed and the user can type a new command in the terminal.*/
+
 	pid_t pid;
 	int status, i;
 	int current_cmd_index = 0;
@@ -161,6 +164,7 @@ void execute_command(struct cmdline *l) {
 	int nb_pipes = count_pipes(l);
 	int pipefd[nb_pipes][2];
 
+	// Store file descriptors
     int old_input_fd = dup(STDIN_FILENO);
 	int old_output_fd = dup(STDOUT_FILENO);
 
@@ -198,15 +202,17 @@ void execute_command(struct cmdline *l) {
     }
 
 
+	// Go through all the commands
 	while (current_cmd_index <= nb_pipes) {
-
+		
+		// Fork to duplicate the process
 		switch (pid = fork()) {
 			case -1:
 				perror("Forking error");
 				exit(EXIT_FAILURE);
 
 			case 0:
-				// If not first command of pipe
+				// If not the first command of pipe
 				if (current_cmd_index != 0) {
 					if (dup2(pipefd[current_cmd_index - 1][STDIN_FILENO], STDIN_FILENO) == -1) {
 						perror("Duping error");
@@ -214,7 +220,7 @@ void execute_command(struct cmdline *l) {
 					}
 				}
 
-				// If not last command of pipe
+				// If not the last command of pipe
 				if (current_cmd_index != nb_pipes) {
 					if (dup2(pipefd[current_cmd_index][STDOUT_FILENO], STDOUT_FILENO) == -1) {
 						perror("Duping error");
@@ -222,6 +228,7 @@ void execute_command(struct cmdline *l) {
 					}
 				}
 
+				// Close alle pipes
 				for (i = 0; i < nb_pipes; i++) {
 					if ((close(pipefd[i][0]) == -1) || (close(pipefd[i][1]) == -1)) {
 						perror("Closing pipe error");
@@ -229,14 +236,16 @@ void execute_command(struct cmdline *l) {
 					}
 				}
 
+				// Execute said command
 				execvp(l->seq[current_cmd_index][0], l->seq[current_cmd_index]);
 				perror("Execvp error");
 				exit(EXIT_FAILURE);
 		}
-		current_cmd_index++;
+		current_cmd_index++; // Go to next command
 	}
 
 
+	// Close all pipes
 	for (i = 0; i < nb_pipes; i++) {
 		if ((close(pipefd[i][0]) == -1) || (close(pipefd[i][1]) == -1)) {
 			perror("Closing pipe error");
@@ -245,7 +254,7 @@ void execute_command(struct cmdline *l) {
 	}
 
 
-	if (l->bg) {
+	if (l->bg) { // if background
 		struct timeval current_time;
 		if (gettimeofday(&current_time, NULL) == -1) {
 			perror("Accessing time");
@@ -253,14 +262,14 @@ void execute_command(struct cmdline *l) {
 		};
 		add_bg_process(pid, current_time);
 
-	} else {
+	} else { // if not background
 		for (i = 0; i <= nb_pipes; i++) {
 			wait(&status); // wait for all process to finish
 		}
 	}
 
 
-	// Link back standard input and output
+	// Link back standard input and output if necessary
     if (l->in || nb_pipes) {
         if (dup2(old_input_fd, STDIN_FILENO) == -1) {
 			perror("Duping error");
@@ -281,6 +290,7 @@ void execute_command(struct cmdline *l) {
 
 
 void add_bg_process(pid_t pid, struct timeval start_time) {
+	/* Function that adds a process to the list of background processes */
 	struct linked_process *new_process = malloc(sizeof(struct linked_process));
 	new_process->process_id = pid;
 	new_process->start_time = start_time;
@@ -300,6 +310,7 @@ void add_bg_process(pid_t pid, struct timeval start_time) {
 }	
 
 void remove_bg_process(pid_t pid) {
+	/* Function that removes a process to the list of background processes */
 	struct linked_process *current_process = bg_process_list;
 	struct linked_process *previous_process = NULL;
 
@@ -324,6 +335,7 @@ void remove_bg_process(pid_t pid) {
 }
 
 int count_pipes(struct cmdline *l) {
+	/* Function that counts number of pipes in a command line */
 	int nb_pipes = 0;
 	while (l->seq[nb_pipes] != NULL) {
 		nb_pipes++;
@@ -332,6 +344,7 @@ int count_pipes(struct cmdline *l) {
 }
 
 void sig_handler(int sig, siginfo_t *info, void *secret) {
+	/* Function taht handles when a child process is finished */
 	
 	// Get current time
 	struct timeval current_time;
